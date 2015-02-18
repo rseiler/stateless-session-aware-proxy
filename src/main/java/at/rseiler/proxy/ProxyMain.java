@@ -1,6 +1,7 @@
 package at.rseiler.proxy;
 
 import com.sun.net.httpserver.HttpServer;
+import org.apache.log4j.Logger;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -9,6 +10,8 @@ import java.util.concurrent.Executors;
 
 public class ProxyMain {
 
+    private static final Logger LOG = Logger.getLogger(ProxyMain.class);
+
     private final int port;
     private ExecutorService executorService;
     private HttpServer httpServer;
@@ -16,12 +19,14 @@ public class ProxyMain {
     public static void main(String[] args) {
         int port = args.length > 0 ? Integer.parseInt(args[0]) : 80;
         ProxyMain ProxyMain = new ProxyMain(port);
+
         try {
             ProxyMain.run();
         } catch (IOException e) {
-            System.out.println("Couldn't start the server. " + e.getMessage());
+            LOG.error("Couldn't start the server. ", e);
         }
-        System.out.println("ProxyMain running on port " + port + ".");
+
+        LOG.info("ProxyMain running on port " + port + ".");
     }
 
     public ProxyMain(int port) {
