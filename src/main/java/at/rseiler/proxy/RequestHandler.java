@@ -15,9 +15,10 @@ import org.apache.log4j.Logger;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.rmi.server.ExportException;
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.*;
 
 public class RequestHandler implements HttpHandler {
 
@@ -30,14 +31,10 @@ public class RequestHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange httpExchange) throws IOException {
         String requestURI = httpExchange.getRequestURI().toString().substring(1);
-        String domain = requestURI.split("/", 3)[1];
+        String server = getServerName(requestURI);
         LOG.info(requestURI);
 
-        if (!httpClientMap.containsKey(domain)) {
-            httpClientMap.put(domain, HttpClientBuilder.create().setConnectionManager(new PoolingHttpClientConnectionManager()).build());
-        }
-
-        HttpClient httpClient = httpClientMap.get(domain);
+        HttpClient httpClient = getHttpClient(server);
 
         try {
             HttpGet request = createHttpGet(httpExchange, requestURI);
@@ -68,6 +65,21 @@ public class RequestHandler implements HttpHandler {
         }
     }
 
+    private String getServerName(String requestURI) throws UnsupportedEncodingException {
+        String[] split = requestURI.split("\\?", 2);
+        String query = split.length == 2 ? split[1] : "";
+        Map<String, List<String>> parameters = parseQuery(query);
+        return parameters.getOrDefault("server", Arrays.asList("default")).get(0);
+    }
+
+    private HttpClient getHttpClient(String server) {
+        if (!httpClientMap.containsKey(server)) {
+            httpClientMap.put(server, HttpClientBuilder.create().setConnectionManager(new PoolingHttpClientConnectionManager()).build());
+        }
+
+        return httpClientMap.get(server);
+    }
+
     private HttpGet createHttpGet(HttpExchange httpExchange, String requestURI) {
         HttpGet request = new HttpGet(requestURI);
 
@@ -92,6 +104,34 @@ public class RequestHandler implements HttpHandler {
                 }
             }
         }
+    }
+
+    private Map<String, List<String>> parseQuery(String query) throws UnsupportedEncodingException {
+        Map<String, List<String>> parameters = new HashMap<>();
+        if (query != null) {
+            String pairs[] = query.split("[&]");
+
+            for (String pair : pairs) {
+                String param[] = pair.split("[=]");
+
+                String key = null;
+                String value = null;
+                if (param.length > 0) {
+                    key = URLDecoder.decode(param[0], System.getProperty("file.encoding"));
+                }
+
+                if (param.length > 1) {
+                    value = URLDecoder.decode(param[1], System.getProperty("file.encoding"));
+                }
+
+                if (!parameters.containsKey(key)) {
+                    parameters.put(key, new ArrayList<String>());
+                }
+                List<String> strings = parameters.get(key);
+                strings.add(value);
+            }
+        }
+        return parameters;
     }
 
 }
